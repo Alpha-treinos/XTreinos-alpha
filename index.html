@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>X-Treino Free Fire</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f3f4fa;--sf:#fff;--tx:#171a2e;--mu:#5d6488;--ac:#c2410c;--acx:#fff;--ln:#d9dcee;--ok:#15803d;--er:#b91c1c;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root{--bg:#14182b;--sf:#1e2440;--tx:#eef0fa;--mu:#9aa3c7;--ac:#ffb020;--acx:#1a1300;--ln:#2d355c;--ok:#4ade80;--er:#f87171}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 Barlow,system-ui,sans-serif}
+main{max-width:560px;margin:0 auto;padding:16px}
+h1{font:700 32px/1 "Barlow Condensed",sans-serif;margin:4px 0 4px}
+h2{font:700 20px/1 "Barlow Condensed",sans-serif;margin:18px 0 8px}
+a{color:var(--ac)}
+nav{display:flex;gap:6px;margin:12px 0}
+nav button{flex:1;padding:11px 0;border:1px solid var(--ln);background:var(--sf);color:var(--mu);font:600 15px Barlow,sans-serif;border-radius:8px}
+nav button.on{background:var(--ac);color:var(--acx);border-color:var(--ac)}
+.row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+input,select{font:inherit;color:var(--tx);background:var(--sf);border:1px solid var(--ln);border-radius:8px;padding:10px;min-width:0;width:100%}
+input:focus,select:focus,button:focus-visible,summary:focus-visible{outline:2px solid var(--ac);outline-offset:1px}
+.f{display:block;margin-bottom:10px}.f span{display:block;font-size:14px;color:var(--mu);margin-bottom:4px}
+.grow{flex:1}.num{width:64px;text-align:center}
+button.b{padding:10px 14px;border-radius:8px;border:1px solid var(--ln);background:var(--sf);color:var(--tx);font:600 15px Barlow,sans-serif}
+button.p{background:var(--ac);color:var(--acx);border-color:var(--ac)}
+button:disabled{opacity:.6}
+.chip{padding:4px 10px;border-radius:99px;border:1px solid var(--ln);font-size:14px;color:var(--mu)}
+.chip.on{color:var(--ok);border-color:var(--ok)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.warn{color:var(--er)}.ok{color:var(--ok)}.muted{color:var(--mu);font-size:14px}
+.card{background:var(--sf);border:1px solid var(--ln);border-radius:10px;margin-bottom:8px}
+.card summary{display:flex;align-items:center;gap:10px;padding:12px;cursor:pointer;list-style:none}
+.card summary::-webkit-details-marker{display:none}
+.ps{width:30px;font:700 24px "Barlow Condensed",sans-serif;color:var(--mu);text-align:center}
+.card.t3 .ps{color:var(--ac)}
+.nm{flex:1;font-weight:600;overflow-wrap:anywhere}
+.sub{display:block;font-weight:400;font-size:13px;color:var(--mu)}
+.pt{font:700 26px "Barlow Condensed",sans-serif;color:var(--ac)}
+.card table{width:calc(100% - 24px);margin:0 12px 12px;border-collapse:collapse}
+th,td{padding:8px 4px;text-align:center;border-top:1px solid var(--ln);font-size:14px}
+th{color:var(--mu);font-weight:600}
+.tm{display:flex;align-items:center;gap:10px;padding:10px 12px}
+textarea{width:100%;height:150px;font:14px/1.4 Barlow,sans-serif;color:var(--tx);background:var(--sf);border:1px solid var(--ln);border-radius:8px;padding:10px}
+footer{margin-top:28px;text-align:center}
+</style>
+</head>
+<body>
+<main id="app"><p class="muted">Carregando...</p></main>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import {getFirestore,collection,doc,onSnapshot,query,orderBy,limit,writeBatch,serverTimestamp,addDoc,updateDoc} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+
+const firebaseConfig={apiKey:"AIzaSyCccgmFQCDeEIvm_UcC08_PCJQMl7gjmHc",authDomain:"x-treinos-alpha.firebaseapp.com",projectId:"x-treinos-alpha",storageBucket:"x-treinos-alpha.firebasestorage.app",messagingSenderId:"494624379702",appId:"1:494624379702:web:d7b3e02e562149dba89997"};
+const ADMIN='lucassq999@gmail.com';
+const app=initializeApp(firebaseConfig),db=getFirestore(app),auth=getAuth(app);
+
+const $=i=>document.getElementById(i);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const slug=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40).replace(/-+$/,'');
+let ev=null,teams=[],contacts={},user=null,tab='i',at='e',cur=0,msg=null,busy=false;
+let f={n:'',c:'',w:''},lg={e:'',p:''},nf={n:'',w:''};
+const isAdm=()=>!!user&&user.email===ADMIN;
+const inAdmin=()=>location.hash==='#admin';
+const note=(t,c)=>{msg={t,c}};
+const noteHtml=()=>msg?`<p class="${msg.c}">${esc(msg.t)}</p>`:'';
+
+/* ---------- dados ---------- */
+let unT=()=>{},unC=()=>{},evId=null;
+onSnapshot(query(collection(db,'events'),orderBy('createdAt','desc'),limit(1)),s=>{
+  const d=s.docs[0];
+  if(!d){ev=null;teams=[];evId=null;unT();unC();render();return}
+  ev={id:d.id,...d.data({serverTimestamps:'estimate'})};
+  if(evId!==d.id){
+    evId=d.id;unT();
+    unT=onSnapshot(query(collection(db,'events',evId,'teams'),orderBy('createdAt')),ts=>{
+      teams=ts.docs.map(x=>({id:x.id,name:x.data({serverTimestamps:'estimate'}).name}));render();
+    },()=>{note('Não foi possível carregar os times.','warn');render()});
+    subC();
+  }
+  render();
+},()=>{note('Não foi possível carregar o evento.','warn');render()});
+function subC(){
+  unC();contacts={};
+  if(!isAdm()||!evId)return;
+  unC=onSnapshot(collection(db,'events',evId,'contacts'),cs=>{contacts={};cs.docs.forEach(x=>contacts[x.id]=x.data());render()},()=>{});
+}
+onAuthStateChanged(auth,u=>{user=u;subC();render()});
+addEventListener('hashchange',()=>{msg=null;render()});
+
+/* ---------- ranking ---------- */
+function calc(){
+  if(!ev)return[];
+  const pts=ev.pts||[],rs=ev.rounds||[];
+  return teams.slice(0,12).map(t=>{
+    let p=0,k=0,b=0;const det=[];
+    rs.forEach((r,qi)=>{
+      const c=r&&r[t.id];if(!c)return;
+      const pl=parseInt(c.p,10),kk=parseInt(c.k,10)||0;
+      if(pl>=1&&pl<=12){const pt=(pts[pl-1]||0)+kk;p+=pt;k+=kk;if(pl===1)b++;det.push({q:qi+1,p:pl,k:kk,pt})}
+    });
+    return{n:t.name,pts:p,k,b,det};
+  }).filter(r=>r.det.length).sort((a,b)=>b.pts-a.pts||b.b-a.b||b.k-a.k);
+}
+function rankHtml(){
+  const rk=calc();
+  if(!rk.length)return '<p class="muted">O ranking aparece aqui assim que a primeira queda for lançada.</p>';
+  return rk.map((r,i)=>`<details class="card${i<3?' t3':''}"><summary><span class="ps">${i+1}</span><span class="nm">${esc(r.n)}<span class="sub">${r.k} abates · ${r.b} booyah${r.b===1?'':'s'}</span></span><span class="pt">${r.pts}</span></summary><table><tr><th>Queda</th><th>Colocação</th><th>Abates</th><th>Pontos</th></tr>${r.det.map(d=>`<tr><td>${d.q}</td><td>${d.p}º</td><td>${d.k}</td><td>${d.pt}</td></tr>`).join('')}</table></details>`).join('')
+   +'<p class="muted">Toque em um time para ver queda por queda. Desempate: pontos, booyahs, abates.</p>';
+}
+function waText(){
+  const m=['🥇','🥈','🥉'];
+  return '🏆 '+ev.name+' ('+(ev.rounds||[]).length+' quedas)\n\n'+calc().map((r,i)=>(m[i]||(i+1)+'º')+' '+r.n+' — '+r.pts+' pts ('+r.k+' abates'+(r.b?', '+r.b+' booyah'+(r.b>1?'s':''):'')+')').join('\n');
+}
+
+/* ---------- visão pública ---------- */
+const nav=(list,cur,fn)=>'<nav>'+list.map(t=>`<button class="${cur===t[0]?'on':''}" onclick="${fn}('${t[0]}')">${t[1]}</button>`).join('')+'</nav>';
+function teamsHtml(){
+  if(!teams.length)return '<p class="muted">Nenhum time inscrito ainda.</p>';
+  const row=(t,l)=>`<div class="card tm"><span class="ps">${l}</span><span class="nm">${esc(t.name)}</span></div>`;
+  let h='<h2>Confirmados</h2>'+teams.slice(0,12).map((t,i)=>row(t,i+1)).join('');
+  if(teams.length>12)h+='<h2>Lista de espera</h2>'+teams.slice(12).map((t,i)=>row(t,i+1)).join('');
+  return h;
+}
+function formHtml(){
+  const mine=localStorage.getItem('xt-mine'),pos=teams.findIndex(t=>t.id===mine);
+  let h='';
+  if(pos>=0)h+=`<p class="ok">Seu time <b>${esc(teams[pos].name)}</b> está inscrito: ${pos<12?'vaga confirmada ('+(pos+1)+'º)':'lista de espera ('+(pos-11)+'º)'}.</p>`;
+  if(ev.status!=='open')return h+'<p class="muted">As inscrições estão encerradas.</p>';
+  if(teams.length>=12)h+='<p class="muted">As 12 vagas já foram preenchidas. Novas inscrições entram na lista de espera, por ordem de chegada.</p>';
+  return h+`<label class="f"><span>Nome do time</span><input maxlength="30" value="${esc(f.n)}" oninput="sf('n',this.value)"></label>
+<label class="f"><span>Nome do capitão</span><input maxlength="40" value="${esc(f.c)}" oninput="sf('c',this.value)"></label>
+<label class="f"><span>WhatsApp do capitão (com DDD)</span><input type="tel" inputmode="tel" maxlength="20" value="${esc(f.w)}" oninput="sf('w',this.value)"></label>
+<p class="muted">O WhatsApp só é visto pelo organizador, para enviar o ID e a senha da sala.</p>
+${noteHtml()}<button class="b p" onclick="enroll()" ${busy?'disabled':''}>${busy?'Enviando...':'Inscrever meu time'}</button>`;
+}
+function pubView(){
+  if(!ev)return '<h1>X-Treino Free Fire</h1><p class="muted">Nenhum x-treino marcado no momento.</p>';
+  const open=ev.status==='open',n=teams.length;
+  return `<h1>${esc(ev.name)}</h1><p class="muted">${esc(ev.when||'')}</p>
+<div class="row"><span class="chip ${open?'on':''}">${open?'Inscrições abertas':'Inscrições encerradas'}</span><span class="chip">${Math.min(n,12)}/12 vagas${n>12?' · '+(n-12)+' na espera':''}</span></div>`
+  +nav([['i','Inscrição'],['t','Times'],['r','Ranking']],tab,'gt')
+  +(tab==='i'?formHtml():tab==='t'?teamsHtml():rankHtml());
+}
+
+/* ---------- área do organizador ---------- */
+function loginHtml(){
+  return `<h1>Área do organizador</h1><label class="f"><span>E-mail</span><input type="email" value="${esc(lg.e)}" oninput="sl('e',this.value)"></label>
+<label class="f"><span>Senha</span><input type="password" value="${esc(lg.p)}" oninput="sl('p',this.value)"></label>${noteHtml()}<button class="b p" onclick="login()">Entrar</button>`;
+}
+function adminView(){
+  if(!user)return loginHtml();
+  if(!isAdm())return '<h1>Área do organizador</h1><p class="warn">Esta conta não é a do organizador.</p><button class="b" onclick="logout()">Sair</button>';
+  let h='<h1>Painel do organizador</h1>'+nav([['e','Evento'],['t','Times'],['q','Quedas'],['x','Texto']],at,'ga');
+  if(at==='e'){
+    if(ev)h+=`<p><b>${esc(ev.name)}</b><br><span class="muted">${esc(ev.when||'')} · inscrições ${ev.status==='open'?'abertas':'encerradas'}</span></p><div class="row"><button class="b p" onclick="toggle()">${ev.status==='open'?'Encerrar inscrições':'Reabrir inscrições'}</button></div>`;
+    h+=`<h2>Novo x-treino</h2><label class="f"><span>Nome</span><input maxlength="50" value="${esc(nf.n)}" oninput="sn('n',this.value)"></label><label class="f"><span>Dia e horário</span><input maxlength="50" placeholder="Sexta, 20h" value="${esc(nf.w)}" oninput="sn('w',this.value)"></label>${noteHtml()}<button class="b" onclick="newEv()">Criar x-treino</button><p class="muted">O novo x-treino passa a ser o que os jogadores veem.</p>`;
+  }else if(!ev)h+='<p class="muted">Crie um x-treino primeiro.</p>';
+  else if(at==='t'){
+    h+=teams.length?teams.map((t,i)=>{const c=contacts[t.id]||{},w=String(c.whatsapp||''),link=w?'https://wa.me/'+(w.length<=11?'55'+w:w):'';
+      return `<div class="card"><div class="tm"><span class="ps">${i<12?i+1:'E'}</span><span class="nm">${esc(t.name)}<span class="sub">${esc(c.captain||'')} ${link?`· <a href="${link}" target="_blank" rel="noopener">${esc(w)}</a>`:''}${i>=12?' · lista de espera':''}</span></span><button class="b" onclick="rm('${t.id}')">Remover</button></div></div>`}).join(''):'<p class="muted">Nenhum time inscrito.</p>';
+  }else if(at==='q'){
+    const rs=ev.rounds||[];if(!rs.length)rs.push({});
+    h+='<div class="chips">'+rs.map((_,i)=>`<button class="b ${i===cur?'p':''}" onclick="gq(${i})">Queda ${i+1}</button>`).join('')+'<button class="b" onclick="addQ()">+ Queda</button></div>';
+    const r=rs[cur]||{},seen={},dup={};
+    teams.slice(0,12).forEach(t=>{const p=(r[t.id]||{}).p;if(p){if(seen[p])dup[p]=1;seen[p]=1}});
+    if(Object.keys(dup).length)h+=`<p class="warn">Colocação repetida: ${Object.keys(dup).join(', ')}º. Confira.</p>`;
+    h+='<div class="row muted"><span class="grow">Time</span><span style="width:84px;text-align:center">Colocação</span><span class="num">Abates</span></div>';
+    h+=teams.slice(0,12).map(t=>{const c=r[t.id]||{p:'',k:0};
+      let o='<option value="">—</option>';for(let p=1;p<=12;p++)o+=`<option value="${p}"${String(c.p)===String(p)?' selected':''}>${p}º</option>`;
+      return `<div class="row"><span class="grow" style="font-weight:600">${esc(t.name)}</span><select style="width:84px" onchange="cell('${t.id}','p',this.value)">${o}</select><input class="num" type="number" inputmode="numeric" min="0" value="${c.k||0}" onchange="cell('${t.id}','k',parseInt(this.value,10)||0)"></div>`}).join('');
+    h+=noteHtml();
+  }else h+=`<textarea id="tx" readonly>${esc(waText())}</textarea><div class="row" style="margin-top:8px"><button class="b p" id="cp" onclick="copyTx()">Copiar ranking</button></div>`;
+  return h+'<div class="row" style="margin-top:20px"><button class="b" onclick="logout()">Sair</button></div>';
+}
+
+/* ---------- ações ---------- */
+async function guard(fn,okMsg){
+  try{await fn();if(okMsg)note(okMsg,'ok')}
+  catch(e){console.error(e);note('Não foi possível concluir. Confira sua conexão e tente de novo.','warn')}
+  render();
+}
+Object.assign(window,{
+  render,
+  sl:(k,v)=>{lg[k]=v},sn:(k,v)=>{nf[k]=v},gq:i=>{cur=i;render()},
+  sf:(k,v)=>{f[k]=v},
+  gt:t=>{tab=t;msg=null;render()},
+  ga:t=>{at=t;msg=null;render()},
+  async enroll(){
+    const name=f.n.trim(),cap=f.c.trim(),wa=f.w.replace(/\D/g,''),id=slug(name);
+    if(name.length<2||cap.length<2||wa.length<10||id.length<2){note('Preencha o time, o capitão e o WhatsApp com DDD.','warn');return render()}
+    busy=true;note('','ok');render();
+    try{
+      const b=writeBatch(db);
+      b.set(doc(db,'events',ev.id,'teams',id),{name,createdAt:serverTimestamp()});
+      b.set(doc(db,'events',ev.id,'contacts',id),{captain:cap,whatsapp:wa,createdAt:serverTimestamp()});
+      await b.commit();
+      localStorage.setItem('xt-mine',id);f={n:'',c:'',w:''};note('Inscrição enviada!','ok');
+    }catch(e){console.error(e);note('Não foi possível inscrever. Esse nome de time já pode estar em uso, ou as inscrições foram encerradas.','warn')}
+    busy=false;render();
+  },
+  async login(){
+    try{await signInWithEmailAndPassword(auth,lg.e.trim(),lg.p);lg.p='';msg=null}
+    catch(e){note('E-mail ou senha incorretos.','warn')}
+    render();
+  },
+  logout:()=>signOut(auth),
+  toggle:()=>guard(()=>updateDoc(doc(db,'events',ev.id),{status:ev.status==='open'?'closed':'open'})),
+  newEv(){
+    if(nf.n.trim().length<2){note('Dê um nome ao x-treino.','warn');return render()}
+    guard(async()=>{await addDoc(collection(db,'events'),{name:nf.n.trim(),when:nf.w.trim(),status:'open',pts:[12,9,8,7,6,5,4,3,2,1,0,0],rounds:[],createdAt:serverTimestamp()});nf={n:'',w:''};cur=0;at='t'});
+  },
+  rm(id){
+    if(!confirm('Remover este time? Quem está na lista de espera sobe uma posição.'))return;
+    guard(async()=>{const b=writeBatch(db);b.delete(doc(db,'events',ev.id,'teams',id));b.delete(doc(db,'events',ev.id,'contacts',id));await b.commit()});
+  },
+  addQ(){const rs=JSON.parse(JSON.stringify(ev.rounds||[]));if(!rs.length)rs.push({});rs.push({});cur=rs.length-1;guard(()=>updateDoc(doc(db,'events',ev.id),{rounds:rs}))},
+  cell(id,key,val){
+    const rs=JSON.parse(JSON.stringify(ev.rounds||[]));if(!rs.length)rs.push({});
+    rs[cur]=rs[cur]||{};const c=rs[cur][id]||{p:'',k:0};c[key]=val;rs[cur][id]=c;
+    guard(()=>updateDoc(doc(db,'events',ev.id),{rounds:rs}));
+  },
+  copyTx(){
+    const ta=$('tx'),b=$('cp');ta.focus();ta.select();
+    let ok=false;try{ok=document.execCommand('copy')}catch(e){}
+    b.textContent=ok?'Copiado!':'Segure o texto e copie';setTimeout(()=>{b.textContent='Copiar ranking'},2000);
+  }
+});
+
+function render(){
+  const a=inAdmin();
+  $('app').innerHTML=(a?adminView():pubView())+'<footer><a href="'+(a?'#':'#admin')+'" class="muted">'+(a?'← Voltar ao site':'Área do organizador')+'</a></footer>';
+}
+render();
+</script>
+</body>
+</html>
