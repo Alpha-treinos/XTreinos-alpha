@@ -1,1 +1,36 @@
-
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>X-Treino Free Fire</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1a4fd6">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="X-Treino">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--sf:rgba(9,15,46,.82);--tx:#eef2ff;--mu:#aeb9e6;--ac:#ffb020;--acx:#1a1300;--ln:rgba(150,172,255,.28);--ok:#4ade80;--er:#f87171;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:dark}
+html{background:#000}
+*{box-sizing:border-box}
+body{margin:0;position:relative;min-height:100vh;overflow-x:hidden;color:var(--tx);font:16px/1.4 Barlow,system-ui,sans-serif;background:linear-gradient(180deg,#1a4fd6 0%,#0f2f8f 30%,#071448 62%,#02040f 85%,#000 100%)}
+main{max-width:560px;margin:0 auto;padding:16px 16px 210px;position:relative;z-index:1}
+h1{font:700 32px/1 "Barlow Condensed",sans-serif;margin:4px 0 4px}
+h2{font:700 20px/1 "Barlow Condensed",sans-serif;margin:18px 0 8px}
+a{color:var(--ac)}
+nav{display:flex;gap:6px;margin:12px 0;overflow-x:auto}
+nav button{flex:1 0 auto;padding:11px 12px;border:1px solid var(--ln);background:var(--sf);color:var(--mu);font:600 14px Barlow,sans-serif;border-radius:8px}
+nav button.on{background:var(--ac);color:var(--acx);border-color:var(--ac)}
+.row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+input,select{font:inherit;color:var(--tx);background:var(--sf);border:1px solid var(--ln);border-radius:8px;padding:10px;min-width:0;width:100%}
+input:focus,select:focus,button:focus-visible,summary:focus-visible{outline:2px solid var(--ac);outline-offset:1px}
+.f{display:block;margin-bottom:10px}.f span{display:block;font-size:14px;color:var(--mu);margin-bottom:4px}
+.grow{flex:1}.num{width:64px;text-align:center}
+button.b{padding:10px 14px;border-radius:8px;border:1px solid var(--ln);background:var(--sf);color:var(--tx);font:600 15px Barlow,sans-serif}
+button.p{background:var(--ac);color:var(--acx);border-color:var(--ac)}
+button:disabled{opacity:.6}
+.chip{padding:4px 10px;border-radius:99px;border:1px solid var(--ln);font-size:14px;color:var(--mu)}
+.chip.on{color:var(--ok);border-color:var(--ok)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
