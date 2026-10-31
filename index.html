@@ -30,6 +30,17 @@ input:focus,select:focus,button:focus-visible,summary:focus-visible{outline:2px 
 .grow{flex:1}.num{width:64px;text-align:center}
 button.b{padding:10px 14px;border-radius:8px;border:1px solid var(--ln);background:var(--sf);color:var(--tx);font:600 15px Barlow,sans-serif}
 button.p{background:var(--ac);color:var(--acx);border-color:var(--ac)}
+button.chip{background:var(--sf);color:var(--tx);font:inherit;cursor:pointer;padding:9px 13px}
+.tabs2{display:flex;gap:6px;margin:8px 0}.tabs2 .b{flex:1;padding:10px 4px}
+.mapbox{overflow:auto;max-height:72vh;border:1px solid var(--ln);border-radius:10px;background:#000}
+.mapin{position:relative}
+.hit{position:absolute;height:4.6%;min-height:22px;transform:translate(-50%,-50%);padding:0;border-radius:6px;border:1.5px solid rgba(255,176,32,.7);background:rgba(255,176,32,.12);cursor:pointer;appearance:none}
+.hit.sel{background:rgba(255,176,32,.45);border:2.5px solid #fff}
+.hit.tk{background:rgba(0,0,0,.5);border-color:transparent;cursor:default}
+.dot{position:absolute;transform:translate(-50%,-135%);min-width:26px;height:26px;padding:0 5px;border-radius:13px;background:var(--ac);color:var(--acx);border:2px solid #1a1300;font:700 15px/22px "Barlow Condensed",sans-serif;text-align:center;pointer-events:none}
+.dot.me{background:#fff;border-color:var(--ac)}
+button.big{display:block;width:100%;text-align:left;padding:16px;margin-bottom:12px;font-size:19px}
+button.big span{display:block;font-weight:400;font-size:13px;margin-top:3px;opacity:.85}
 button:disabled{opacity:.6}
 .chip{padding:4px 10px;border-radius:99px;border:1px solid var(--ln);font-size:14px;color:var(--mu)}
 .chip.on{color:var(--ok);border-color:var(--ok)}
@@ -106,10 +117,23 @@ const app=initializeApp(firebaseConfig),db=getFirestore(app),auth=getAuth(app);
 const $=i=>document.getElementById(i);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const slug=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40).replace(/-+$/,'');
+const kfull=s=>String(s).normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
+const klet=s=>kfull(s).replace(/[0-9]/g,'');
+const lev1=(a,b)=>{if(Math.abs(a.length-b.length)>1)return false;let i=0;while(i<a.length&&i<b.length&&a[i]===b[i])i++;
+  return a.length===b.length?(a.slice(i+1)===b.slice(i+1)||(a[i]===b[i+1]&&a[i+1]===b[i]&&a.slice(i+2)===b.slice(i+2))):a.length>b.length?a.slice(i+1)===b.slice(i):b.slice(i+1)===a.slice(i)};
+/* times com nome igual ou parecido (exact = mesmo nome, que não pode existir duas vezes) */
+function similares(n){
+  const s=slug(n),a=kfull(n),al=klet(n);
+  return allT.filter(t=>t.id!==user.uid).map(t=>{const nm=t.name||'',b=kfull(nm),bl=klet(nm),exact=slug(nm)===s||(!!a&&a===b);
+    const ok=exact||(al.length>=3&&al===bl)||(Math.min(a.length,b.length)>=4&&(a.includes(b)||b.includes(a)))||(a.length>=5&&b.length>=5&&lev1(a,b));
+    return ok?{t,exact}:null}).filter(Boolean);
+}
 let ev=null,teams=[],contacts={},user=null,tab='i',at='e',cur=0,msg=null,busy=false;
 let wk=[];
 let regras=null,rd=null,ew='';
 let evAll=null,pv=null,unS=()=>{},slotUsed=new Set(),claimed=new Set(),roomInfo=null,rview=null,unRv=()=>{},rmf={i:'',p:''},tAt=0,aAt=0,wAt=0,statsMeta=null,stBusy=false,stMsg='',stMsgC='muted';
+let calls=[],unCalls=()=>{},cq=1,csel=null,cz=1,cbusy=false;
+let sim=null,cr=false,tq='',tReady=false,tBusy=false,meReady=false;
 let me=null,team=null,mem=[],rq=[],allT=[],myst={},un=[],memOn=false,lf={e:'',p:'',tn:''},pf={n:'',f:''};
 let f={n:'',w:'',p1:'',p2:'',p3:'',p4:'',s1:'',s2:''},lg={e:'',p:''},nf={n:'',d:''};
 const isAdm=()=>!!user&&ADMINS.includes(String(user.email||'').toLowerCase());
@@ -121,10 +145,10 @@ const noteHtml=()=>msg?`<p class="${msg.c}">${esc(msg.t)}</p>`:'';
 let unT=()=>{},unC=()=>{},evId=null;
 onSnapshot(query(collection(db,'events'),orderBy('createdAt','desc'),limit(1)),s=>{
   const d=s.docs[0];
-  if(!d){ev=null;teams=[];evId=null;unT();unC();unS();render();return}
+  if(!d){ev=null;teams=[];evId=null;unT();unC();unS();unCalls();calls=[];render();return}
   ev={id:d.id,...d.data({serverTimestamps:'estimate'})};
   if(evId!==d.id){
-    evId=d.id;ew='';unT();slotUsed=new Set();subRv();
+    evId=d.id;ew='';unT();slotUsed=new Set();subRv();subCalls();
     unT=onSnapshot(query(collection(db,'events',evId,'teams'),orderBy('createdAt')),ts=>{
       teams=norm(ts.docs.map(x=>{const d=x.data({serverTimestamps:'estimate'});return{id:x.id,name:d.name,slot:d.slot||0,uid:d.uid||''}}));render();
     },()=>{note('Não foi possível carregar os times.','warn');render()});
@@ -177,29 +201,55 @@ const MAPAS=[
  {n:'Nova Terra',r:['Universidade','Museu','Pontes gêmeas','Parque eólico','Fazendinha','Tirolesa','Cidade velha','Academia de boxe','Manguezal','Galeria Deca','Feira plaza','Planetário']},
  {n:'Solara',r:['Clube da cela','Moinho de vento','Cachoeira','Laboratório','Arco','Parque','Resort','Aquário','Enseada','Torre de TV','Floresópolis','Piscinão','Roliúde']}
 ];
+const MAPK=['bermuda','purgatorio','kalahari','novaterra','solara'];
+const POS={"bermuda":{"Peak":{"x":65.7,"y":55.4,"w":7.5},"Clock Tower":{"x":38.9,"y":56.8,"w":16.2},"Factory":{"x":44.7,"y":65.6,"w":11.2},"Pochinok":{"x":56.5,"y":76.5,"w":12.5},"Mars Eletric":{"x":51.9,"y":81.4,"w":17.5},"Sentosa":{"x":86.1,"y":75.5,"w":11.2},"Keraton":{"x":84.8,"y":40.1,"w":11.2},"Mill":{"x":68.3,"y":31.2,"w":7.5},"Cape Town":{"x":88.4,"y":55.4,"w":13.8},"Represa":{"x":61.4,"y":25.7,"w":11.2},"Shipyard":{"x":40.5,"y":10.6,"w":12.5},"Bullseye":{"x":30.1,"y":16.7,"w":12.5},"Graveyard":{"x":24.3,"y":28.8,"w":13.8},"Observatory":{"x":10.8,"y":40.1,"w":16.2},"Hangar":{"x":15.6,"y":55.4,"w":10.0},"Rim Nam Village":{"x":13.9,"y":78.0,"w":21.2},"Katulistiwa":{"x":39.2,"y":36.1,"w":16.2},"Bimasakti Strip":{"x":46.1,"y":47.1,"w":21.2}},"purgatorio":{"Moathouse":{"x":56.5,"y":15.5,"w":13.8},"Crossroads":{"x":29.6,"y":16.7,"w":15.0},"Field":{"x":60.6,"y":36.8,"w":8.8},"Ski Lodge":{"x":86.6,"y":39.2,"w":13.8},"Forge":{"x":88.0,"y":51.7,"w":8.8},"Brasilia":{"x":53.0,"y":51.0,"w":12.5},"Central":{"x":38.6,"y":78.8,"w":11.2},"Campsite":{"x":73.1,"y":61.8,"w":12.5},"Lumber Mill":{"x":74.1,"y":80.5,"w":16.2},"Fire brigade":{"x":53.1,"y":83.9,"w":17.5},"Mt. Villa":{"x":17.4,"y":72.0,"w":13.8},"Quary":{"x":13.4,"y":58.3,"w":8.8},"Golf course":{"x":27.6,"y":65.4,"w":16.2},"Marbleworks":{"x":19.0,"y":41.2,"w":16.2}},"kalahari":{"Assentamento":{"x":28.2,"y":14.8,"w":17.5},"Santuário":{"x":44.3,"y":18.7,"w":13.8},"Câmara":{"x":73.4,"y":23.1,"w":10.0},"Ruínas":{"x":30.8,"y":34.2,"w":10.0},"Playground":{"x":56.7,"y":33.7,"w":15.0},"Prisão":{"x":80.6,"y":34.6,"w":10.0},"Labirinto":{"x":18.2,"y":52.6,"w":13.8},"Refinaria":{"x":41.9,"y":52.0,"w":13.8},"Porto seguro":{"x":77.3,"y":51.9,"w":17.5},"Cemitério de elefantes":{"x":26.4,"y":73.7,"w":30.0},"Submarino":{"x":45.1,"y":79.7,"w":13.8},"Posto de comando":{"x":63.1,"y":66.9,"w":22.5},"Pedra do baú":{"x":74.4,"y":76.0,"w":17.5}},"novaterra":{"Universidade":{"x":43.2,"y":13.7,"w":17.5},"Museu":{"x":23.0,"y":34.4,"w":8.8},"Pontes gêmeas":{"x":67.6,"y":25.1,"w":18.8},"Parque eólico":{"x":8.1,"y":56.2,"w":18.8},"Fazendinha":{"x":38.0,"y":51.9,"w":15.0},"Tirolesa":{"x":64.8,"y":51.0,"w":12.5},"Cidade velha":{"x":86.1,"y":52.3,"w":17.5},"Academia de boxe":{"x":58.3,"y":61.0,"w":22.5},"Manguezal":{"x":79.6,"y":74.2,"w":13.8},"Galeria Deca":{"x":51.7,"y":75.6,"w":17.5},"Feira plaza":{"x":38.9,"y":67.3,"w":16.2},"Planetário":{"x":15.7,"y":69.5,"w":15.0}},"solara":{"Clube da cela":{"x":52.6,"y":9.9,"w":18.8},"Moinho de vento":{"x":82.9,"y":16.7,"w":21.2},"Cachoeira":{"x":29.2,"y":20.8,"w":13.8},"Laboratório":{"x":14.4,"y":49.3,"w":16.2},"Arco":{"x":38.2,"y":46.6,"w":7.5},"Parque":{"x":53.7,"y":31.9,"w":10.0},"Resort":{"x":93.7,"y":36.1,"w":10.0},"Aquário":{"x":90.3,"y":70.8,"w":11.2},"Enseada":{"x":75.9,"y":90.6,"w":11.2},"Torre de TV":{"x":58.8,"y":56.8,"w":16.2},"Floresópolis":{"x":40.1,"y":71.1,"w":17.5},"Piscinão":{"x":55.1,"y":93.1,"w":12.5},"Roliúde":{"x":16.9,"y":71.1,"w":11.2}}};
 function shuffle(a){const x=a.slice(),r=new Uint32Array(x.length);crypto.getRandomValues(r);for(let i=x.length-1;i>0;i--){const j=r[i]%(i+1);[x[i],x[j]]=[x[j],x[i]]}return x}
 function makeDraw(){const d={};MAPAS.forEach((m,i)=>{d['q'+(i+1)]=shuffle(m.r).slice(0,12)});return d}
-function sorteioHtml(){
-  const d=ev&&ev.draw;
-  if(!d||!ev.drawShow)return '<p class="muted">O sorteio das regiões ainda não foi divulgado. Ele sai perto do horário do x-treino.</p>';
-  const by={};teams.forEach(t=>by[t.slot]=t);
-  const mine=team?teams.find(t=>t.id===slug(team.name)):null;
-  let h='<p class="muted">Cada slot cai em uma região diferente em cada queda. O sorteio é feito para cada x-treino.</p>';
-  if(mine&&mine.slot<=12)h+=`<div class="card" style="padding:12px"><b>Seu time · slot ${mine.slot}</b>`+MAPAS.map((m,i)=>`<div class="row" style="margin:6px 0 0"><span class="grow muted">Queda ${i+1} · ${esc(m.n)}</span><b>${esc((d['q'+(i+1)]||[])[mine.slot-1]||'—')}</b></div>`).join('')+'</div>';
-  MAPAS.forEach((m,i)=>{const a=d['q'+(i+1)]||[];h+=`<h2>Queda ${i+1} · ${esc(m.n)}</h2>`+a.map((rg,k)=>{const t=by[k+1];return `<div class="card tm"><span class="ps">${k+1}</span><span class="nm">${esc(rg)}<span class="sub">${t?esc(t.name):'Vago'}</span></span></div>`}).join('')});
+function subCalls(){unCalls();calls=[];if(!evId)return;unCalls=onSnapshot(collection(db,'events',evId,'calls'),q=>{calls=q.docs.map(x=>({id:x.id,...x.data({serverTimestamps:'estimate'})}));render()},()=>{})}
+function callMap(q){const byS={},byR={};calls.forEach(c=>{if(!c.id.startsWith('q'+q+'-'))return;if(c.kind==='s')byS[c.slot]={r:c.region,a:!!c.auto};else byR[c.rid]=c.slot});return{byS,byR}}
+const myTeam=()=>user&&team&&ev?teams.find(t=>t.id===slug(team.name)):null;
+const canPick=()=>{const t=myTeam();return !!t&&t.slot>=1&&t.slot<=12&&t.uid===user.uid};
+function callsList(adm){
+  const by={};teams.forEach(t=>by[t.slot]=t);let h='';
+  MAPAS.forEach((m,i)=>{const q=i+1,{byS}=callMap(q);
+    h+=`<h2>Queda ${q} · ${esc(m.n)}</h2>`+Array.from({length:12},(_,k)=>k+1).map(sl=>{const t=by[sl],c=byS[sl];
+      return `<div class="card tm"><span class="ps">${sl}</span><span class="nm">${t?esc(t.name):'Vago'}<span class="sub">${c?esc(c.r)+(c.a?' (sorteada)':''):(adm?'Sem call':'Ainda não escolheu')}</span></span></div>`}).join('')});
   return h;
+}
+function sorteioHtml(){
+  if(!ev)return '<p class="muted">Ainda não há x-treino.</p>';
+  let h='<p class="muted">Cada time confirmado escolhe a sua call em cada queda. A escolha é única e não pode ser trocada.</p>';
+  if(canPick())h+=`<button class="b p big" onclick="location.hash='#calls'">Escolher call<span>Escolha a sua região no mapa</span></button>`;
+  return h+callsList(false);
 }
 function sorteioAdmin(){
   if(!ev)return '<p class="muted">Crie um x-treino primeiro.</p>';
-  const d=ev.draw;
-  let h='<p class="muted">Sorteia uma região para cada slot (1 a 12) em cada queda, com um mapa fixo por queda. Cada x-treino tem o seu sorteio. Depois de sortear, toque em Mostrar aos jogadores.</p>';
-  h+=`<div class="row"><button class="b p" onclick="sortear()">${d?'Sortear de novo':'Sortear agora'}</button>${d?`<button class="b" onclick="mostrarSorteio()">${ev.drawShow?'Ocultar dos jogadores':'Mostrar aos jogadores'}</button>`:''}</div>${noteHtml()}`;
-  if(d){
-    h+=`<p class="muted">Situação: ${ev.drawShow?'visível para os jogadores':'oculto'}.</p>`;
-    const by={};teams.forEach(t=>by[t.slot]=t);
-    MAPAS.forEach((m,i)=>{const a=d['q'+(i+1)]||[];h+=`<h2>Queda ${i+1} · ${esc(m.n)}</h2>`+a.map((rg,k)=>`<div class="card tm"><span class="ps">${k+1}</span><span class="nm">${esc(rg)}<span class="sub">${by[k+1]?esc(by[k+1].name):'Vago'}</span></span></div>`).join('')});
-  }
-  return h;
+  return '<p class="muted">Os times confirmados (slots 1 a 12) escolhem a call de cada queda pelo site, e a escolha é única. Quem não escolher pode ser sorteado aqui, entre as calls que sobraram.</p>'
+   +`<div class="row"><button class="b p" onclick="sortearRestantes()">Sortear as calls que faltam</button><button class="b" onclick="limparCalls()">Apagar todas as escolhas</button></div>${noteHtml()}`+callsList(true);
+}
+function callsCard(){
+  const t=myTeam();if(!t)return '';
+  if(t.slot>12)return '<div class="card" style="padding:14px;margin-bottom:12px"><b>Calls</b><p class="muted" style="margin:6px 0 0">Seu time é reserva neste x-treino. Só os 12 confirmados escolhem call.</p></div>';
+  const n=[1,2,3,4,5].filter(q=>callMap(q).byS[t.slot]).length;
+  return `<div class="card" style="padding:14px;margin-bottom:12px"><b>Calls do x-treino</b><p class="muted" style="margin:6px 0 10px">${n}/5 quedas escolhidas. A escolha é única e não pode ser trocada.</p><button class="b p" onclick="location.hash='#calls'">${n===5?'Ver minhas calls':'Escolher call'}</button></div>`;
+}
+function callsView(){
+  if(!user)return loginView();
+  if(!ev)return '<h1>Calls</h1><p class="muted">Ainda não há x-treino.</p>';
+  if(!canPick())return `<h1>Escolher call</h1><p class="muted">Só o capitão de um time entre os 12 confirmados do x-treino pode escolher a call. Inscreva o seu time primeiro.</p><button class="b" onclick="location.hash='#meutime'">Voltar</button>`;
+  const t=myTeam(),m=MAPAS[cq-1],pos=POS[MAPK[cq-1]],{byS,byR}=callMap(cq),mine=byS[t.slot],names=m.r;
+  const abas='<div class="tabs2">'+MAPAS.map((x,i)=>`<button class="b${cq===i+1?' p':''}" onclick="setCq(${i+1})">${i+1}${callMap(i+1).byS[t.slot]?' ✓':''}</button>`).join('')+'</div>';
+  const zoom=[1,2,3].map(z=>`<button class="b${cz===z?' p':''}" onclick="setCz(${z})">${z}×</button>`).join('');
+  const hits=names.map((n,i)=>{const p=pos[n];if(!p)return '';const tk=byR[slug(n)],st=`left:${p.x}%;top:${p.y}%;width:${p.w}%`;
+    return tk?`<span class="hit tk" style="${st}"></span><span class="dot${tk===t.slot?' me':''}" style="left:${p.x}%;top:${p.y}%">${tk}</span>`
+             :`<button class="hit${csel===n?' sel':''}" style="${st}" onclick="askCall(${i})" aria-label="${esc(n)}"></button>`}).join('');
+  let pnl;
+  if(mine)pnl=`<div class="card" style="padding:14px;margin:12px 0"><b>Sua call na Queda ${cq}: ${esc(mine.r)}</b><p class="muted" style="margin:4px 0 0">Escolha confirmada. Não pode ser trocada.${mine.a?' (sorteada pelos ADMs)':''}</p></div>`;
+  else if(csel)pnl=`<div class="card" style="padding:14px;margin:12px 0;border-color:var(--ac)"><b>Escolher ${esc(csel)} na Queda ${cq}?</b><p class="muted" style="margin:4px 0 10px">Essa escolha é definitiva: depois de confirmar, não dá para trocar.</p><div class="row"><button class="b p" onclick="confirmCall()">Confirmar escolha</button><button class="b" onclick="cancelCall()">Cancelar</button></div></div>`;
+  else pnl='<p class="muted">Toque no nome da call no mapa ou na lista abaixo.</p>';
+  const free=names.filter(n=>!byR[slug(n)]);
+  const list=!mine&&free.length?'<h2>Calls livres</h2><div class="chips">'+free.map(n=>`<button class="chip" onclick="askCall(${names.indexOf(n)})">${esc(n)}</button>`).join('')+'</div>':'';
+  return `<p><button class="b" onclick="location.hash='#meutime'">‹ Meu time</button></p><h1>Escolher call</h1><p class="muted" style="margin:0 0 8px">${esc(team.name)} · slot ${t.slot}</p>${abas}<h2>Queda ${cq} · ${esc(m.n)}</h2>${noteHtml()}<div class="row" style="margin-bottom:8px"><span class="muted">Zoom</span>${zoom}</div><div class="mapbox"><div class="mapin" style="width:${cz*100}%"><img src="mapa-${MAPK[cq-1]}.jpg" alt="Mapa ${esc(m.n)}" style="width:100%;display:block">${hits}</div></div>${pnl}${list}`;
 }
 /* ---------- estatísticas (site Estatísticas) ---------- */
 const dayKey=d=>d.toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'});
@@ -357,10 +407,10 @@ function subC(){
 }
 onAuthStateChanged(auth,u=>{user=u;subC();subMe();subRv();routeLoad();render()});
 function subMe(){
-  un.forEach(f=>f());un=[];memOn=false;me=null;team=null;mem=[];rq=[];myst={};
+  un.forEach(f=>f());un=[];memOn=false;me=null;team=null;mem=[];rq=[];myst={};tReady=false;meReady=false;cr=false;sim=null;
   if(!user)return;
   const uid=user.uid;
-  un.push(onSnapshot(doc(db,'users',uid),s=>{me=s.exists()?s.data():null;if(me&&!pf.n&&!pf.f)pf={n:me.nick||'',f:me.ffId||''};syncPub();claimId();render()},()=>{}));
+  un.push(onSnapshot(doc(db,'users',uid),s=>{me=s.exists()?s.data():null;meReady=true;if(me&&!pf.n&&!pf.f)pf={n:me.nick||'',f:me.ffId||''};syncPub();claimId();render()},()=>{}));
   un.push(onSnapshot(doc(db,'teams',uid),s=>{
     team=s.exists()?{id:s.id,...s.data()}:null;
     if(team&&!memOn){memOn=true;
@@ -370,9 +420,9 @@ function subMe(){
     render();},()=>{}));
 }
 async function loadTeams(force){
-  if(!force&&Date.now()-tAt<60000)return;tAt=Date.now();
+  if(!force&&Date.now()-tAt<60000)return;tAt=Date.now();tBusy=true;
   try{const q=await getDocs(query(collection(db,'teams'),orderBy('createdAt')));allT=q.docs.map(x=>({id:x.id,...x.data({serverTimestamps:'estimate'})}))}catch(e){tAt=0}
-  await loadMyst();render();
+  await loadMyst();tBusy=false;render();
 }
 async function loadMyst(){
   if(!user||!me)return;
@@ -381,7 +431,7 @@ async function loadMyst(){
     if(t.id===user.uid){o[t.id]='mine';return}
     try{const [m,r]=await Promise.all([getDoc(doc(db,'teams',t.id,'members',user.uid)),getDoc(doc(db,'teams',t.id,'requests',user.uid))]);o[t.id]=m.exists()?'member':r.exists()?'pending':''}catch(e){o[t.id]=''}
   }));
-  myst=o;render();
+  myst=o;tReady=true;render();
 }
 const aerr=e=>{const c=(e&&e.code)||'';return c==='auth/unauthorized-domain'?'Este endereço ainda não foi autorizado no Firebase. Avise um ADM.':(c==='auth/popup-closed-by-user'||c==='auth/cancelled-popup-request')?'Login cancelado.':c==='auth/popup-blocked'?'O navegador bloqueou a janela do Google. Libere pop-ups ou abra no Chrome.':c==='auth/email-already-in-use'?'Esse e-mail já tem conta. Use "Entrar".':c==='auth/weak-password'?'Senha fraca: use pelo menos 6 caracteres.':c==='auth/invalid-email'?'E-mail inválido.':(c==='auth/invalid-credential'||c==='auth/wrong-password'||c==='auth/user-not-found')?'E-mail ou senha incorretos.':c==='auth/operation-not-allowed'?'Este tipo de login ainda não foi ativado.':'Não foi possível entrar. Tente de novo.'};
 function loginView(){
@@ -451,10 +501,11 @@ function perfilView(){
 <label class="f"><span>ID do Free Fire (só números)${me?' · não pode ser alterado':''}</span><input inputmode="numeric" maxlength="15" value="${esc(pf.f)}" ${me?'readonly':''} oninput="spf('f',this.value)"></label>
 ${me?'<p class="muted">Suas estatísticas ficam ligadas à sua conta e ao seu ID, então continuam mesmo se você trocar de nick.</p>':''}${noteHtml()}<div class="row"><button class="b p" onclick="saveProfile()">Salvar perfil</button><button class="b" onclick="logout2()">Sair da conta</button></div>`;
 }
-function timesView(){
-  let h='<h1>Times</h1><p class="muted">Times criados pelos capitães. Peça vaga no time da sua equipe e espere o capitão aceitar.</p>'+noteHtml();
-  if(!allT.length)return h+'<p class="muted">Nenhum time criado ainda.</p>';
-  allT.forEach(t=>{
+function timesList(){
+  if(!allT.length)return '<p class="muted">Nenhum time criado ainda.</p>';
+  const q=kfull(tq),L=q?allT.filter(t=>kfull(t.name||'').includes(q)):allT;
+  if(!L.length)return '<p class="muted">Nenhum time encontrado com esse nome.</p>';
+  return L.map(t=>{
     const st=myst[t.id];let btn='';
     if(!user)btn='<a class="b" href="#entrar">Entrar para pedir vaga</a>';
     else if(!me)btn='<a class="b" href="#perfil">Complete seu perfil</a>';
@@ -462,9 +513,12 @@ function timesView(){
     else if(st==='member')btn='<span class="ok">Você está neste time</span>';
     else if(st==='pending')btn=`<button class="b" onclick="cancelReq('${t.id}')">Cancelar pedido</button>`;
     else btn=`<button class="b p" onclick="reqJoin('${t.id}')">Pedir vaga</button>`;
-    h+=`<div class="card tm"><span class="nm">${esc(t.name)}<span class="sub">Capitão: <a href="#jogador/u:${t.captainUid}" style="color:inherit">${esc(t.captainNick||'')}</a></span></span>${btn}${isAdm()?`<button class="b" onclick="delTeam('${t.id}')">Remover</button>`:''}</div>`;
-  });
-  return h;
+    return `<div class="card tm"><span class="nm">${esc(t.name)}<span class="sub">Capitão: <a href="#jogador/u:${t.captainUid}" style="color:inherit">${esc(t.captainNick||'')}</a></span></span>${btn}${isAdm()?`<button class="b" onclick="delTeam('${t.id}')">Remover</button>`:''}</div>`;
+  }).join('');
+}
+function timesView(){
+  return '<h1>Times</h1><p class="muted">Se o seu time já aparece aqui, toque em <b>Pedir vaga</b> e espere o capitão aceitar. <b>Não crie outro time.</b></p>'+noteHtml()
+   +(allT.length>5?`<label class="f"><span>Buscar time</span><input id="tq" value="${esc(tq)}" placeholder="Digite o nome do time" oninput="stq(this.value)"></label>`:'')+'<div id="tl">'+timesList()+'</div>';
 }
 const cutoffMs=()=>{const s=startMs();return s===null?null:s-30*60000};
 function enrollBox(){
@@ -479,12 +533,32 @@ function enrollBox(){
   else h+=`<p class="muted" style="margin:8px 0">Titulares escolhidos: ${pc}/4${freeSlot()>12?' · entra como reserva (vaga '+freeSlot()+')':''}</p><button class="b p" onclick="enrollTeam()">Inscrever meu time</button>`;
   return h+'</div>';
 }
+function escolhaView(pen){
+  let h=`<h1>Olá, ${esc(me.nick)}!</h1><p class="muted">Você ainda não está em nenhum time. O que você quer fazer?</p>`;
+  if(pen.length)h+='<h2>Pedidos enviados</h2>'+pen.map(t=>`<div class="card tm"><span class="nm">${esc(t.name)}<span class="sub">Esperando o capitão ${esc(t.captainNick||'')} aceitar</span></span><button class="b" onclick="cancelReq('${t.id}')">Cancelar</button></div>`).join('');
+  return h+noteHtml()+`<button class="b p big" onclick="goJoin()">Entrar em um time<span>O meu time já está no site: vou pedir vaga ao capitão</span></button><button class="b big" onclick="goCreate()">Criar um time<span>Eu sou o capitão e o meu time ainda não está no site</span></button>`;
+}
+function criarView(){
+  let h='<h1>Criar um time</h1><p class="muted">Só crie se você for o <b>capitão</b> e o seu time ainda <b>não estiver</b> no site. Se ele já existe, volte e escolha “Entrar em um time”.</p>';
+  if(sim){
+    const hard=sim.list.some(x=>x.exact);
+    h+=`<div class="card" style="padding:14px;border-color:var(--er)"><b class="warn">${hard?'Já existe um time com esse nome':'Já existe um time com nome parecido'}</b><p class="muted" style="margin:6px 0 10px">Confira se não é o seu time antes de criar outro:</p>`
+     +sim.list.map(x=>`<div class="tm" style="padding:8px 0"><span class="nm">${esc(x.t.name)}<span class="sub">Capitão: ${esc(x.t.captainNick||'—')}</span></span><button class="b p" onclick="reqJoin('${x.t.id}')">É o meu time! Pedir vaga</button></div>`).join('')
+     +(hard?'<p class="muted" style="margin:8px 0 0">Dois times não podem ter o mesmo nome. Se o seu time é outro, escolha um nome diferente.</p>':'<button class="b" style="margin-top:8px" onclick="createTeam(true)">Não é o meu time, criar mesmo assim</button>')+'</div>';
+  }
+  return h+`<label class="f"><span>Nome do time</span><input maxlength="30" value="${esc(lf.tn)}" oninput="sl2('tn',this.value)"></label>${noteHtml()}<div class="row"><button class="b p" onclick="createTeam()">Criar time</button><button class="b" onclick="backChoice()">Voltar</button></div>`;
+}
 function meutimeView(){
   if(!user)return loginView();
-  if(!me)return '<h1>Meu time</h1><p class="muted">Complete seu perfil antes (nick e ID do Free Fire).</p><a class="b p" href="#perfil">Ir para o perfil</a>';
-  if(!team)return `<h1>Criar meu time</h1><p class="muted">Quem cria o time é o capitão. Cada pessoa pode ser capitão de 1 time. Depois, avise seus jogadores para pedirem vaga na página Times.</p><label class="f"><span>Nome do time</span><input maxlength="30" value="${esc(lf.tn)}" oninput="sl2('tn',this.value)"></label>${noteHtml()}<button class="b p" onclick="createTeam()">Criar time</button>`;
+  if(!me)return meReady?perfilView():'<h1>Meu time</h1><p class="muted">Carregando...</p>';
+  if(!team){
+    if(!tReady){if(!tBusy)loadTeams(true);return '<h1>Meu time</h1><p class="muted">Carregando...</p>'}
+    const mt=allT.find(t=>myst[t.id]==='member'),pen=allT.filter(t=>myst[t.id]==='pending');
+    if(mt)return `<h1>Meu time</h1><div class="card" style="padding:14px"><b>${esc(mt.name)}</b><div class="muted">Capitão: <a href="#jogador/u:${mt.captainUid}" style="color:inherit">${esc(mt.captainNick||'')}</a></div></div><p class="muted">Você faz parte deste time. O capitão escolhe quem joga em cada x-treino.</p>`;
+    return cr?criarView():escolhaView(pen);
+  }
   const pc=mem.filter(m=>m.role==='p').length,sc=mem.filter(m=>m.role==='s').length,ord={p:0,s:1,'':2};
-  let h=`<h1>${esc(team.name)}</h1><p class="muted">Você é o capitão.</p>`+enrollBox()+noteHtml();
+  let h=`<h1>${esc(team.name)}</h1><p class="muted">Você é o capitão.</p>`+enrollBox()+callsCard()+noteHtml();
   h+=`<h2>Pedidos de entrada (${rq.length})</h2>`+(rq.length?rq.map(r=>`<div class="card tm"><span class="nm">${esc(r.nick)}<span class="sub">ID ${esc(r.ffId)}</span></span><button class="b p" onclick="acc('${r.uid}')">Aceitar</button><button class="b" onclick="rej('${r.uid}')">Recusar</button></div>`).join(''):'<p class="muted">Nenhum pedido agora.</p>');
   h+=`<h2>Jogadores do time</h2><p class="muted">Toque no botão para escolher quem joga: Fora, Titular ou Reserva. Titulares ${pc}/4 · Reservas ${sc}/2</p>`;
   mem.slice().sort((a,b)=>(ord[a.role||'']-ord[b.role||''])||String(a.nick).localeCompare(String(b.nick))).forEach(m=>{
@@ -593,7 +667,7 @@ function pubView(){
   const open=ev.status==='open',n=conf().length;
   return `<h1>${esc(ev.name)}</h1><p class="muted">${esc(ev.when||'')}</p>
 <div class="row"><span class="chip ${open?'on':''}">${open?'Inscrições abertas':'Inscrições encerradas'}</span><span class="chip">${n>=12?'Vagas esgotadas':n+'/12 vagas'}</span>${res().length?`<span class="chip">${res().length} reserva${res().length>1?'s':''}</span>`:''}</div>${countdownHtml()}${roomCard()}`
-  +nav([['i','Inscrição'],['t','Times'],['r','Ranking'],['k','Abates'],['d','Sorteio'],['g','Regras']],tab,'gt')
+  +nav([['i','Inscrição'],['t','Times'],['r','Ranking'],['k','Abates'],['d','Calls'],['g','Regras']],tab,'gt')
   +(tab==='i'?inscHtml():tab==='t'?teamsHtml():tab==='r'?rankHtml():tab==='k'?fragsHtml():tab==='d'?sorteioHtml():regrasHtml());
 }
 
@@ -605,7 +679,7 @@ function loginHtml(){
 function adminView(){
   if(!user)return loginHtml();
   if(!isAdm())return '<h1>Área do organizador</h1><p class="warn">Esta conta não é a do organizador.</p><button class="b" onclick="logout()">Sair</button>';
-  let h='<h1>Painel do organizador</h1>'+nav([['e','Evento'],['t','Times'],['q','Quedas'],['k','Abates'],['s','Sala'],['d','Sorteio'],['g','Regras'],['z','Estatísticas'],['x','Texto']],at,'ga');
+  let h='<h1>Painel do organizador</h1>'+nav([['e','Evento'],['t','Times'],['q','Quedas'],['k','Abates'],['s','Sala'],['d','Calls'],['g','Regras'],['z','Estatísticas'],['x','Texto']],at,'ga');
   if(at==='e'){
     if(ev)h+=`<p><b>${esc(ev.name)}</b><br><span class="muted">${esc(ev.when||'')} · inscrições ${ev.status==='open'?'abertas':'encerradas'}</span></p><div class="row"><button class="b p" onclick="toggle()">${ev.status==='open'?'Encerrar inscrições':'Reabrir inscrições'}</button></div>`;
     if(ev)h+=`<label class="f" style="margin-top:12px"><span>Data e horário deste x-treino</span><input type="datetime-local" value="${esc(ew||toLocalInput())}" oninput="sw(this.value)"></label><button class="b" onclick="saveWhen()">Atualizar horário</button>`;
@@ -646,11 +720,40 @@ Object.assign(window,{
   runStats(){runStats()},
   menu:o=>{document.body.classList.toggle('menu',!!o)},
   srm:(k,v)=>{rmf[k]=v},
-  sortear(){
-    if(ev.draw&&!confirm('Já existe um sorteio neste x-treino. Sortear de novo?'))return;
-    guard(()=>updateDoc(doc(db,'events',ev.id),{draw:makeDraw(),drawShow:false,drawAt:serverTimestamp()}),'Sorteio feito. Toque em Mostrar aos jogadores quando quiser divulgar.');
+  setCq(q){cq=q;csel=null;msg=null;render()},
+  setCz(z){cz=z;render()},
+  askCall(i){csel=MAPAS[cq-1].r[i];msg=null;render()},
+  cancelCall(){csel=null;render()},
+  async confirmCall(){
+    const t=myTeam();if(!t||!csel||cbusy)return;
+    const q=cq,r=csel,rid=slug(r),{byS,byR}=callMap(q);
+    if(byS[t.slot]){note('Você já escolheu a call desta queda.','warn');return render()}
+    if(byR[rid]){csel=null;note('Essa call acabou de ser escolhida por outro time. Escolha outra.','warn');return render()}
+    cbusy=true;
+    try{
+      const base={slot:t.slot,team:t.id,region:r,rid,uid:user.uid,createdAt:serverTimestamp()},b=writeBatch(db);
+      b.set(doc(db,'events',evId,'calls',`q${q}-r-${rid}`),{...base,kind:'r'});
+      b.set(doc(db,'events',evId,'calls',`q${q}-s-${t.slot}`),{...base,kind:'s'});
+      await b.commit();csel=null;note('Call confirmada: '+r+'.','ok');
+    }catch(e){console.error(e);csel=null;note('Não foi possível confirmar. Essa call pode ter sido escolhida por outro time agora. Escolha outra ou tente de novo.','warn')}
+    cbusy=false;render();
   },
-  mostrarSorteio(){guard(()=>updateDoc(doc(db,'events',ev.id),{drawShow:!ev.drawShow}))},
+  sortearRestantes(){
+    if(!ev||!isAdm())return;
+    const b=writeBatch(db),reg=teams.filter(t=>t.slot>=1&&t.slot<=12);let n=0;
+    for(let q=1;q<=5;q++){
+      const {byS,byR}=callMap(q),free=shuffle(MAPAS[q-1].r.filter(r=>!byR[slug(r)]));
+      reg.filter(t=>!byS[t.slot]).forEach(t=>{const r=free.pop();if(!r)return;const rid=slug(r),base={slot:t.slot,team:t.id,region:r,rid,uid:t.uid,createdAt:serverTimestamp(),auto:true};
+        b.set(doc(db,'events',evId,'calls',`q${q}-r-${rid}`),{...base,kind:'r'});b.set(doc(db,'events',evId,'calls',`q${q}-s-${t.slot}`),{...base,kind:'s'});n++});
+    }
+    if(!n){note('Todos os times confirmados já têm call em todas as quedas.','ok');return render()}
+    guard(()=>b.commit(),n+' calls sorteadas.');
+  },
+  limparCalls(){
+    if(!isAdm()||!calls.length)return;
+    if(!confirm('Apagar todas as escolhas de call deste x-treino? Os times poderão escolher de novo.'))return;
+    guard(async()=>{const b=writeBatch(db);calls.forEach(c=>b.delete(doc(db,'events',evId,'calls',c.id)));await b.commit()},'Escolhas apagadas.');
+  },
   cp(el){const ta=document.createElement('textarea');ta.value=el.dataset.v;document.body.appendChild(ta);ta.select();let ok=false;try{ok=document.execCommand('copy')}catch(e){}ta.remove();el.textContent=ok?'Copiado!':'Copie manualmente';setTimeout(()=>{el.textContent='Copiar'},2000)},
   liberar(){
     const id=rmf.i.trim(),pw=rmf.p.trim();
@@ -660,13 +763,13 @@ Object.assign(window,{
   ocultar(){guard(async()=>{const b=writeBatch(db);roomBatch(b,rmf.i.trim(),rmf.p.trim(),new Set(),false);await b.commit()},'Sala ocultada.')},
   sl2:(k,v)=>{lf[k]=v},
   spf:(k,v)=>{pf[k]=v},
-  async gLogin(){try{await signInWithPopup(auth,new GoogleAuthProvider());lf.p='';location.hash='#perfil'}catch(e){note(aerr(e),'warn');render()}},
-  async eLogin(){try{await signInWithEmailAndPassword(auth,lf.e.trim(),lf.p);lf.p='';location.hash='#perfil'}catch(e){note(aerr(e),'warn');render()}},
-  async eSignup(){try{await createUserWithEmailAndPassword(auth,lf.e.trim(),lf.p);lf.p='';location.hash='#perfil'}catch(e){note(aerr(e),'warn');render()}},
+  async gLogin(){try{await signInWithPopup(auth,new GoogleAuthProvider());lf.p='';location.hash='#meutime'}catch(e){note(aerr(e),'warn');render()}},
+  async eLogin(){try{await signInWithEmailAndPassword(auth,lf.e.trim(),lf.p);lf.p='';location.hash='#meutime'}catch(e){note(aerr(e),'warn');render()}},
+  async eSignup(){try{await createUserWithEmailAndPassword(auth,lf.e.trim(),lf.p);lf.p='';location.hash='#meutime'}catch(e){note(aerr(e),'warn');render()}},
   async eReset(){if(!lf.e.trim()){note('Digite seu e-mail primeiro.','warn');return render()}try{await sendPasswordResetEmail(auth,lf.e.trim());note('Enviamos um e-mail para você trocar a senha.','ok')}catch(e){note(aerr(e),'warn')}render()},
   async logout2(){await signOut(auth);location.hash='#'},
   async saveProfile(){
-    const nick=pf.n.trim(),ff=(me?me.ffId:pf.f.replace(/\D/g,''));
+    const nick=pf.n.trim(),ff=(me?me.ffId:pf.f.replace(/\D/g,'')),nova=!me;
     if(nick.length<2||ff.length<5){note('Preencha o nick e o ID do Free Fire (só números, mínimo 5).','warn');return render()}
     if(!me&&!confirm('Confira o seu ID do Free Fire: '+ff+'\n\nDepois de salvo, ele NÃO poderá ser alterado. Está certo?'))return;
     try{
@@ -674,19 +777,27 @@ Object.assign(window,{
       if(!me){d.ffId=ff;d.createdAt=serverTimestamp();b.set(doc(db,'ffids',ff),{uid:user.uid})}
       b.set(doc(db,'users',user.uid),d,{merge:true});
       if(team&&team.captainNick!==nick)b.update(doc(db,'teams',team.id),{captainNick:nick});
-      await b.commit();note('Perfil salvo.','ok');
+      await b.commit();note('Perfil salvo.','ok');if(nova)location.hash='#meutime';
     }catch(e){note('Não foi possível salvar. Se o ID já estiver cadastrado em outra conta, fale com um ADM.','warn')}
     render();
   },
-  createTeam(){
+  goJoin(){location.hash='#times'},
+  goCreate(){cr=true;sim=null;msg=null;render()},
+  backChoice(){cr=false;sim=null;msg=null;render()},
+  stq(v){tq=v;const e=$('tl');if(e)e.innerHTML=timesList()},
+  async createTeam(force){
     const n=lf.tn.trim();if(n.length<2||slug(n).length<2){note('Escolha um nome com pelo menos 2 letras ou números.','warn');return render()}
+    await loadTeams(true);
+    const m=similares(n);
+    if(m.some(x=>x.exact)||(m.length&&!force)){sim={list:m,name:n};msg=null;return render()}
+    sim=null;
     guard(async()=>{const b=writeBatch(db);
       b.set(doc(db,'teams',user.uid),{name:n,captainUid:user.uid,captainNick:me.nick,createdAt:serverTimestamp()});
       b.set(doc(db,'teams',user.uid,'members',user.uid),{nick:me.nick,ffId:me.ffId,role:'p',joinedAt:serverTimestamp()});
       b.set(doc(db,'users',user.uid),{team:n,teamId:user.uid,updatedAt:serverTimestamp()},{merge:true});
-      await b.commit();lf.tn=''},'Time criado! Avise seus jogadores para pedirem vaga na página Times.');
+      await b.commit();lf.tn='';cr=false},'Time criado! Avise seus jogadores para pedirem vaga na página Times.');
   },
-  reqJoin(t){guard(async()=>{await setDoc(doc(db,'teams',t,'requests',user.uid),{nick:me.nick,ffId:me.ffId,createdAt:serverTimestamp()});await loadTeams(true)},'Pedido enviado! Espere o capitão aceitar.')},
+  reqJoin(t){cr=false;sim=null;guard(async()=>{await setDoc(doc(db,'teams',t,'requests',user.uid),{nick:me.nick,ffId:me.ffId,createdAt:serverTimestamp()});await loadTeams(true)},'Pedido enviado! Espere o capitão aceitar.')},
   cancelReq(t){guard(async()=>{await deleteDoc(doc(db,'teams',t,'requests',user.uid));await loadTeams(true)})},
   acc(u){const r=rq.find(x=>x.uid===u);if(!r)return;guard(async()=>{const b=writeBatch(db);b.set(doc(db,'teams',team.id,'members',u),{nick:r.nick,ffId:r.ffId,role:'',joinedAt:serverTimestamp()});b.delete(doc(db,'teams',team.id,'requests',u));await b.commit()},'Jogador aceito.')},
   rej(u){guard(()=>deleteDoc(doc(db,'teams',team.id,'requests',u)))},
@@ -805,9 +916,12 @@ Object.assign(window,{
   }
 });
 
+function banner(){return user&&meReady&&!me?'<div class="card" style="padding:14px;border-color:var(--ac);margin-bottom:12px"><b>Falta pouco!</b><p class="muted" style="margin:6px 0 10px">Complete o seu perfil (nick e ID do Free Fire) para participar dos x-treinos.</p><button class="b p" onclick="location.hash=\'#meutime\'">Completar perfil</button></div>':''}
 function render(){
-  const h=location.hash,p=h==='#admin'?'admin':h==='#redes'?'redes':h==='#entrar'?'entrar':h==='#perfil'?'perfil':h==='#times'?'times':h==='#meutime'?'meutime':h.startsWith('#jogador/')?'jogador':'inicio';
-  $('app').innerHTML=p==='admin'?adminView()+'<footer><a href="#" class="muted">← Voltar ao site</a></footer>':p==='redes'?redesView():p==='entrar'?(user?perfilView():loginView()):p==='perfil'?perfilView():p==='times'?timesView():p==='meutime'?meutimeView():p==='jogador'?jogadorView():pubView();
+  const h=location.hash,p=h==='#admin'?'admin':h==='#redes'?'redes':h==='#entrar'?'entrar':h==='#perfil'?'perfil':h==='#times'?'times':h==='#meutime'?'meutime':h==='#calls'?'calls':h.startsWith('#jogador/')?'jogador':'inicio';
+  const sc=[...document.querySelectorAll('.mapbox')].map(e=>[e.scrollLeft,e.scrollTop]);
+  $('app').innerHTML=p==='admin'?adminView()+'<footer><a href="#" class="muted">← Voltar ao site</a></footer>':p==='redes'?redesView():p==='entrar'?(user?perfilView():loginView()):p==='perfil'?perfilView():p==='times'?timesView():p==='meutime'?meutimeView():p==='calls'?callsView():p==='jogador'?jogadorView():banner()+pubView();
+  document.querySelectorAll('.mapbox').forEach((e,i)=>{if(sc[i]){e.scrollLeft=sc[i][0];e.scrollTop=sc[i][1]}});
   [['m1','inicio'],['m2','times'],['m3','meutime'],['m4','perfil'],['m5','redes'],['m6','admin']].forEach(([id,k])=>$(id).classList.toggle('on',k===p||(k==='perfil'&&p==='entrar')));
   const l=$('lgin');l.textContent=user?'Perfil':'Entrar';l.setAttribute('href',user?'#perfil':'#entrar');
 }
