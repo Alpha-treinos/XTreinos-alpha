@@ -112,7 +112,7 @@ a.b{display:inline-block;text-decoration:none}
 </div>
 <header class="bar"><button onclick="menu(1)" aria-label="Abrir menu"><i></i><i></i><i></i></button><b>ALPHA TREINOS</b><a href="#entrar" id="lgin" class="lg">Entrar</a></header>
 <div id="dim" onclick="menu(0)"></div>
-<div id="drawer"><div class="t">ALPHA TREINOS</div><a href="#" id="m1" onclick="menu(0)">Início</a><a href="#times" id="m2" onclick="menu(0)">Times</a><a href="#meutime" id="m3" onclick="menu(0)">Meu time</a><a href="#perfil" id="m4" onclick="menu(0)">Perfil</a><a href="#redes" id="m5" onclick="menu(0)">Redes</a><a href="#admin" id="m6" class="sm" onclick="menu(0)">Área do organizador</a></div>
+<div id="drawer"><div class="t">ALPHA TREINOS</div><a href="#" id="m1" onclick="menu(0)">Início</a><a href="#times" id="m2" onclick="menu(0)">Times</a><a href="#meutime" id="m3" onclick="menu(0)">Meu time</a><a href="#perfil" id="m4" onclick="menu(0)">Perfil</a><a href="#redes" id="m5" onclick="menu(0)">Redes</a><a href="https://alpha-treinos.github.io/Estat-sticas/" onclick="menu(0)">Estatísticas ›</a><a href="#admin" id="m6" class="sm" onclick="menu(0)">Área do organizador</a></div>
 <main id="app"><p class="muted">Carregando...</p></main>
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
@@ -707,12 +707,13 @@ function formHtml(){
 +`<p class="muted">Use o nome que aparece no jogo. O WhatsApp só é visto pelo organizador. Os nicks aparecem no ranking de abates.</p>
 ${noteHtml()}<button class="b p" onclick="enroll()" ${busy?'disabled':''}>${busy?'Enviando...':'Inscrever meu time'}</button>`;
 }
+const statsBtn=()=>'<a class="card rede" href="https://alpha-treinos.github.io/Estat-sticas/" style="margin:12px 0"><span class="nm">Estatísticas<span class="sub">Rankings, recordes, times e jogadores</span></span><span class="go">›</span></a>';
 function pubView(){
-  if(!ev)return '<h1>X-Treino Free Fire</h1><p class="muted">Nenhum x-treino marcado no momento.</p>';
+  if(!ev)return '<h1>X-Treino Free Fire</h1><p class="muted">Nenhum x-treino marcado no momento.</p>'+statsBtn();
   const open=ev.status==='open',n=conf().length;
   return `<h1>${esc(ev.name)}</h1><p class="muted">${esc(ev.when||'')}</p>
 <div class="row"><span class="chip ${open?'on':''}">${open?'Inscrições abertas':'Inscrições encerradas'}</span><span class="chip">${n>=12?'Vagas esgotadas':n+'/12 vagas'}</span>${res().length?`<span class="chip">${res().length} reserva${res().length>1?'s':''}</span>`:''}</div>${countdownHtml()}${roomCard()}`
-  +nav([['i','Inscrição'],['t','Times'],['r','Ranking'],['k','Abates'],['d','Calls'],['g','Regras']],tab,'gt')
+  +statsBtn()+nav([['i','Inscrição'],['t','Times'],['r','Ranking'],['k','Abates'],['d','Calls'],['g','Regras']],tab,'gt')
   +(tab==='i'?inscHtml():tab==='t'?teamsHtml():tab==='r'?rankHtml():tab==='k'?fragsHtml():tab==='d'?sorteioHtml():regrasHtml());
 }
 
